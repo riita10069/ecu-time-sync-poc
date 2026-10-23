@@ -1,0 +1,99 @@
+# サービス名がそのままホスト名になる (finch compose は networks.aliases を無視するため)。
+# どのサービスもホストにポートを公開しない。通信はすべて compose の内部ネットワーク poc で完結する。
+# client だけは option A の検証で time.aws.com と time.cloudflare.com へ外向き通信する。
+x-base: &base
+  build: .
+  image: ecu-time-sync-poc:latest
+  volumes:
+    - ./out:/poc/out:ro
+    - ./config:/poc/config:ro
+    - ./app:/poc/app:ro
+
+services:
+  # クラウド側の時刻サーバー。AWS では EC2 上の chrony が 169.254.169.123 と PHC に同期する役。
+  # 平文 NTP、対称鍵 NTP、NTS を同じ chronyd で提供する。
+  timesrv:
+    <<: *base
+    command: chronyd -d -x -u root -f /poc/config/chrony-server.conf
+    networks: [poc]
+
+  # 攻撃者が立てた偽の NTS サーバー。信頼していない CA の証明書を持つ。
+  rogue:
+    <<: *base
+    command: chronyd -d -x -u root -f /poc/config/chrony-rogue.conf
+    networks: [poc]
+
+  # 経路上の攻撃者。UDP 123 の NTP 応答の時刻を書き換え、TCP 4460 の NTS-KE は素通しする。
+  mitm:
+    <<: *base
+    command: python3 /poc/app/mitm.py --upstream timesrv --offset 3600
+    networks: [poc]
+
+  # API Gateway (mTLS) + Lambda の代役。/time と /ntp-key を提供する。
+  api:
+    <<: *base
+    command: python3 /poc/app/mtls_api.py
+    environment:
+      BIND: 0.0.0.0   # コンテナ内 bind。ポートは公開しない
+    networks: [poc]
+
+  # 車両の TCU 役。run-all.sh から exec で各シナリオを実行する。
+  client:
+    <<: *base
+    command: sleep infinity
+    networks: [poc]
+
+  # ここから下は Fargate 構成の再現 (profile: relay)。
+  # Local Amazon Time Sync Service の代役
+  localsync:
+    <<: *base
+    profiles: [relay]
+    command: chronyd -d -x -u root -f /poc/config/chrony-localsync.conf
+    networks: [poc]
+
+  # Fargate タスクの代役。Fargate では chrony とヘルスチェックを別コンテナにして
+  # ネットワーク名前空間を共有させるが、finch compose は network_mode: service: を
+  # 扱えないので 1 コンテナで両方を動かす。
+  # NET_ADMIN は NAT Gateway 障害をデフォルトルート削除で再現するためだけに付ける (Fargate では付けない)
+  relay:
+    <<: *base
+    profiles: [relay]
+    command: bash -c "chronyd -x -u root -f /poc/config/chrony-relay.conf && exec python3 /poc/app/healthcheck.py"
+    environment:
+      BIND: 0.0.0.0   # タスク内 bind。ポートは公開しない。本番はセキュリティグループで NLB からのみ許可
+    cap_add: [NET_ADMIN]
+    networks: [poc]
+
+
+  # ここから下は NTS pool 拡張でトークンなしでは cookie を得られない構成 (profile: pool)。
+  # ntpd-rs: NTS-KE (4460, 本番は Lambda からのみ) と NTS 必須の NTP (123)
+  ntpdrs:
+    <<: *base
+    profiles: [pool]
+    volumes:
+      - ./out:/poc/out:ro
+      - ./config:/poc/config:ro
+      - ./scripts:/poc/scripts:ro
+    command: /poc/scripts/ntpd-rs-entrypoint.sh
+    networks: [poc]
+
+  # 2 台目の ntpd-rs。同じマスター鍵ファイルを読む
+  ntpdrs2:
+    <<: *base
+    profiles: [pool]
+    volumes:
+      - ./out:/poc/out:ro
+      - ./config:/poc/config:ro
+      - ./scripts:/poc/scripts:ro
+    command: /poc/scripts/ntpd-rs-entrypoint.sh
+    networks: [poc]
+
+  # ntpd-rs 向けの経路上の攻撃者
+  mitm-nts:
+    <<: *base
+    profiles: [pool]
+    command: python3 /poc/app/mitm.py --upstream ntpdrs --offset 3600
+    networks: [poc]
+
+networks:
+  poc: {}

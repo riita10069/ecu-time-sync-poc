@@ -1,0 +1,31 @@
+# ntpd-rs 1.9.0。NTS-KE で cookie を発行し、NTS 付きの NTP にだけ応答する。
+# 時刻源は持たない。システム時計をそのまま配り、時計の正しさは同じタスクの chrony が監視する。
+
+[observability]
+log-level = "info"
+observation-path = "/tmp/ntpd-rs-observe"
+
+[synchronization]
+# 時刻源がないときに名乗る stratum。ヘルスチェックで時計のずれを見ている前提で 2 にする
+local-stratum = 2
+
+[[server]]
+listen = "0.0.0.0:123"
+# NTS なしの要求には DENY の kiss code を返す
+require-nts = "deny"
+
+[[nts-ke-server]]
+# この TCP 4460 はインターネットに出さない。トークンなしの通常の NTS-KE でも cookie を出してしまうため、
+# 本番ではセキュリティグループで Lambda からのみ許可する
+listen = "0.0.0.0:4460"
+certificate-chain-path = "/poc/out/certs/ntpdrs.pem"
+private-key-path = "/poc/out/certs/ntpdrs.key"
+accepted-pool-authentication-tokens = ["__POOL_TOKEN__"]
+
+[keyset]
+# cookie のマスター鍵は全タスクで同じものを使う。起動時に Secrets Manager の鍵ファイルを読み、
+# プロセス内ではローテーションしない (各タスクが別々の乱数で鍵を作ってしまうため)。
+# ローテーションは scripts/ntpd-keyset.py で鍵ファイルを更新してタスクを入れ替えて行う
+key-storage-path = "/tmp/ntpd-keyset"
+key-rotation-interval = 315360000
+stale-key-count = 2

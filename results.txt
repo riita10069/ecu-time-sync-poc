@@ -1,0 +1,35 @@
+# run at 2026-10-22T08:22:17Z
+
+## 0. 事実確認: public endpoint の NTS-KE
+time.aws.com:4460 -> NG TimeoutError: timed out
+time.cloudflare.com:4460 -> OK tls=TLSv1.3 alpn=ntske/1
+
+## A. 平文 NTP
+sntp time.aws.com: offset=-0.139 ms delay=13.251 ms
+A  time.aws.com plain                        2026-10-22T08:22:50Z System clock wrong by 0.000027 seconds (ignored) 
+A  time.aws.com nts                          2026-10-22T08:22:59Z No suitable source for synchronisation 
+ref time.cloudflare.com nts                  2026-10-22T08:23:05Z System clock wrong by 0.000585 seconds (ignored) 
+A  local plain direct                        2026-10-22T08:23:10Z System clock wrong by 0.000032 seconds (ignored) 
+A  local plain via MITM(+3600s)              2026-10-22T08:23:15Z System clock wrong by 3600.000725 seconds (ignored) 
+
+## B. NTS (自前 chrony サーバー)
+B  nts direct                                2026-10-22T08:23:21Z System clock wrong by 0.000121 seconds (ignored) 
+B  nts via MITM(+3600s)                      2026-10-22T08:23:32Z No suitable source for synchronisation 
+B  nts rogue server (untrusted CA)           2026-10-22T08:23:33Z TLS handshake with 10.4.3.9:4460 (rogue) failed : Error in the certificate verification. The certificate is NOT trusted. The certificate issuer is unknown.  2026-10-22T08:23:41Z No suitable source for synchronisation 
+
+## C. 対称鍵 NTP (鍵は mTLS API から取得)
+fetched key id over mTLS: 1001
+C  key direct                                2026-10-22T08:23:46Z System clock wrong by 0.000028 seconds (ignored) 
+C  key via MITM(+3600s)                      2026-10-22T08:23:57Z No suitable source for synchronisation 
+
+## D. mTLS API で時刻取得
+mtls /time cert=VIN001: first(offset=+2.005 ms delay=4.531 ms) best(offset=-0.007 ms delay=0.080 ms)
+mtls /time cert=VIN999: REJECTED RuntimeError: HTTP 403 {'error': 'vehicle not registered', 'cn': 'VIN999'}
+mtls /time cert=none: REJECTED SSLError: [SSL: TLSV13_ALERT_CERTIFICATE_REQUIRED] tlsv13 alert certificate required (_ssl.c:2546)
+mtls /time cert=rogue-vehicle: REJECTED SSLError: [SSL: TLSV1_ALERT_UNKNOWN_CA] tlsv1 alert unknown ca (_ssl.c:2546)
+/ntp-key VIN001 200
+/ntp-key VIN999 403
+
+## E. ハイブリッド (NTP の値を mTLS 時刻で検証)
+hybrid ntp=timesrv ntp_offset=+0.017 ms mtls_offset=-0.068 ms diff=0.084 ms -> ACCEPT ntp
+hybrid ntp=mitm ntp_offset=+3600000.177 ms mtls_offset=-0.013 ms diff=3600000.189 ms -> REJECT ntp, fallback to mtls time

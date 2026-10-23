@@ -1,0 +1,12 @@
+1. VIN001 が API から鍵と cookie を取得                      HTTP 200, cookies=8, ntp=ntpdrs:123
+2. その cookie で NTS 付き NTP                            {'ok': True, 'offset_ms': 7.758246, 'delay_ms': 15.648638, 'stratum': 2, 'new_cookies': 1}
+   20 回続けて問い合わせ (cookie は毎回補充)                       cookies left=8 best delay=0.091 ms offset=+0.013 ms
+3. 証明書 VIN999 で API から取得                             HTTP 403
+3. 証明書 rogue-vehicle で API から取得                      REJECTED SSLError
+3. 証明書 None で API から取得                               REJECTED SSLError
+4. 平文 NTP (SNTP) を ntpd-rs へ                         RuntimeError: kiss code DENY
+   応答の stratum と kiss code                           stratum=0 refid=b'DENY'
+5. でたらめな cookie で NTS 付き NTP                         {'ok': False, 'kiss': 'NTSN'}
+6. 誤ったトークンで Fixed Key Request                        REJECTED NTS-KE error code [1]
+7. 経路上で時刻を +3600 秒書き換え                               {'ok': False, 'error': 'authentication failed (packet tampered or wrong key)'}
+8. トークンなしの通常 NTS-KE (4460 に届く場合)                     cookies issued=8

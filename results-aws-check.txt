@@ -1,0 +1,10 @@
+API 証明書=None                                   REJECTED RemoteDisconnected: Remote end closed connection without response
+API 証明書=VIN999                                 (403, {'error': 'vehicle not registered', 'cn': 'VIN999'})
+平文 NTP -> 公開 NLB                               RuntimeError: kiss code DENY
+NTS-KE TCP 4460 -> 公開 NLB                      unreachable (TimeoutError)
+でたらめな cookie -> 公開 NLB                         {'ok': False, 'kiss': 'NTSN'}
+VIN001 で API から取得                              cookies=8 server=ntp.ecu-time.riita.people.aws.dev
+NTS 付き NTP 60 回                                ok=60/60 refetched_from_api=0 errors=[]
+  遅延最小のサンプル                                    offset=+0.856 ms delay=8.679 ms stratum=2
+比較: time.aws.com (平文 SNTP 8 回の最良)              offset=+0.616 ms delay=14.224 ms
+  差 (自前サーバー - time.aws.com)                    +0.240 ms

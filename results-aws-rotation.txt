@@ -1,0 +1,22 @@
+=== 21:41:58 phase prune
+id_offset=1 primary=0 key_ids=[1] primary_id=1
+ed7d72d7-7d0f-42af-b615-26dce76eaf94
+ecs-svc/7759462182246095154
+waiting for rolling deployment...
+deployment stable at 21:45:05
+loop: 21:44:56 sent=950 fails=2 refetched=0 last_offset=-11.757 ms
+=== 21:45:05 phase add
+id_offset=1 primary=0 key_ids=[1, 2] primary_id=1
+7fec7639-cec4-4e08-90e0-27f656f153b2
+ecs-svc/7442870524023552116
+waiting for rolling deployment...
+deployment stable at 21:49:29
+loop: 21:49:29 sent=2200 fails=3 refetched=0 last_offset=-14.580 ms
+=== 21:49:29 phase promote
+id_offset=1 primary=1 key_ids=[1, 2] primary_id=2
+7ffad63d-3326-4c77-abd7-00fec6ee6ae9
+ecs-svc/9368700172532918515
+waiting for rolling deployment...
+deployment stable at 21:53:23
+loop: 21:53:17 sent=3250 fails=3 refetched=0 last_offset=-18.705 ms
+=== prune 21:59:17-22:02:09 (separately run)

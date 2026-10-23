@@ -1,0 +1,6 @@
+out/
+infra/.terraform/
+infra/*.tfstate*
+infra/*.tfplan
+.DS_Store
+__pycache__/
